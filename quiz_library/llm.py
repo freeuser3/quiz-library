@@ -86,6 +86,8 @@ class LLMClient:
         self.last_total_ms = (time.monotonic() - t0) * 1000.0
         try:
             content = data["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                raise LLMError(f"unexpected content type: {type(content).__name__}")
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMError(f"unexpected response shape: {data}") from exc
         if not content or not content.strip():

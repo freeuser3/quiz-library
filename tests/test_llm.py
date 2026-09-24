@@ -121,6 +121,15 @@ async def test_empty_content_raises_llm_error():
         await client.generate_question(_para())
 
 
+async def test_non_string_content_raises_llm_error():
+    # список фрагментов вместо строки — мусор, не должен падать как AttributeError
+    resp = FakeResponse({"choices": [{"message": {"content": ["a", "b"]}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    with pytest.raises(LLMError):
+        await client.generate_question(_para())
+
+
 async def test_prompt_truncated_to_max_context():
     resp = FakeResponse({"choices": [{"message": {"content": CONTENT}}]})
     sess = FakeSession(resp)

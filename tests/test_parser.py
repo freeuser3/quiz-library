@@ -7,6 +7,11 @@ def test_plain_phrase():
     assert parse_paragraph("параграф 6", ["параграф", "параграфа", "§"]) == 6
 
 
+def test_capitalized_phrase():
+    # реальное задание может начинаться с заглавной «Параграф 6»
+    assert parse_paragraph("Параграф 6", ["параграф", "§"]) == 6
+
+
 def test_paragraph_with_questions_suffix():
     assert parse_paragraph("прочитать параграф 6, вопросы 1-3", ["параграф", "§"]) == 6
 

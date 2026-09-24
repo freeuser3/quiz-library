@@ -17,7 +17,7 @@ def parse_paragraph(text: str, patterns: list[str]) -> int | None:
         return None
     patterns = sorted(patterns, key=len, reverse=True)
     expr = "(?:" + "|".join(re.escape(p) for p in patterns) + r")\s*(\d{1,3})\b"
-    m = re.search(expr, text)
+    m = re.search(expr, text, re.IGNORECASE)
     if not m:
         return None
     return int(m.group(1))
