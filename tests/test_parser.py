@@ -1,6 +1,11 @@
 import pytest
 
-from quiz_library.parser import parse_paragraph
+from quiz_library.parser import (
+    parse_paragraph,
+    is_platform_homework,
+    is_empty_homework,
+    has_para_marker_without_number,
+)
 
 
 def test_plain_phrase():
@@ -44,3 +49,29 @@ def test_regex_special_chars_in_pattern_escaped():
 def test_semantic_check_overlapping_words():
     # «параграфа» начинается с «параграф»; оба паттерна не дают двойного матча
     assert parse_paragraph("параграфа 3", ["параграф", "параграфа", "§"]) == 3
+
+
+def test_platform_sirius():
+    assert is_platform_homework("Сириус, урок 8")
+    assert is_platform_homework("В прикрепленном файле выполнить…")
+
+
+def test_platform_http_link():
+    assert is_platform_homework("https://4ege.ru/gia-matematika/80634.html")
+
+
+def test_platform_negative():
+    assert not is_platform_homework("Газовая промышленность. Пересказ § 6")
+
+
+def test_empty_placeholder():
+    assert is_empty_homework("---Не указана---")
+    assert not is_empty_homework("")
+
+
+def test_marker_without_number_true():
+    assert has_para_marker_without_number("параграф про факторы скорости реакции", ["параграф", "§"])
+
+
+def test_marker_without_number_false():
+    assert not has_para_marker_without_number("Безопасное поведение в горах", ["параграф", "§"])
