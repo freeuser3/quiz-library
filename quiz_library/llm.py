@@ -52,7 +52,7 @@ class LLMClient:
         if len(body) > MAX_CONTEXT_CHARS:
             body = body[:MAX_CONTEXT_CHARS].rsplit("\n", 1)[0]   # граница строки, не слова
         return (
-            f"Параграф {paragraph.number}. {paragraph.title}\n"
+            f"Параграф {paragraph.key}. {paragraph.title}\n"
             f"Страницы: {start}-{end}\n\n{body}"
         )
 

@@ -3,7 +3,7 @@ from quiz_library.text import paragraph_plain_text
 
 
 def _para(blocks):
-    return Paragraph(number=6, title="t", pages=(22, 25), blocks=blocks)
+    return Paragraph(key="6", title="t", pages=(22, 25), blocks=blocks)
 
 
 def test_joins_lines_in_block_order_skipping_page():

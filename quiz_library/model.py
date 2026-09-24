@@ -12,7 +12,7 @@ class HomeworkEntry:
 @dataclass
 class Question:
     subject: str
-    paragraph: int
+    paragraph: str
     paragraph_title: str
     pages: tuple[int, int]
     text: str
@@ -20,7 +20,7 @@ class Question:
 
 @dataclass
 class Paragraph:
-    number: int
+    key: str
     title: str
     pages: tuple[int, int]
     blocks: list[dict]

@@ -16,6 +16,10 @@ class SubjectEntry:
     book: str
     digest_path: str
     paragraph_patterns: list[str]
+    match_paragraphs: bool = True
+    search_threshold: float = 0.45
+    search_gap: float = 1.3
+    search_llm_min: float = 0.25
 
 
 def load_subjects(path: str | Path) -> dict[str, dict]:
@@ -31,6 +35,10 @@ def load_registry(subjects_path: str | Path) -> "DigestsRegistry":
             book=cfg.get("book", ""),
             digest_path=cfg["digest"],
             paragraph_patterns=list(cfg.get("paragraph_patterns", [])),
+            match_paragraphs=bool(cfg.get("match_paragraphs", True)),
+            search_threshold=float(cfg.get("search_threshold", 0.45)),
+            search_gap=float(cfg.get("search_gap", 1.3)),
+            search_llm_min=float(cfg.get("search_llm_min", 0.25)),
         )
     return DigestsRegistry(entries)
 
@@ -62,17 +70,26 @@ class DigestsRegistry:
         self._cache[subject] = data
         return data
 
-    def paragraph(self, subject: str, number: int) -> Paragraph | None:
+    def paragraph(self, subject: str, key: str) -> Paragraph | None:
         data = self._digest_json(subject)
         if not data:
             return None
-        raw = data.get("paragraphs", {}).get(str(number))
+        raw = data.get("paragraphs", {}).get(str(key))
         if not raw:
             return None
         pages = raw.get("pages", {})
         return Paragraph(
-            number=number,
+            key=str(key),
             title=raw.get("title", ""),
-            pages=(int(pages.get("start", number)), int(pages.get("end", number))),
+            pages=(int(pages.get("start", 0)), int(pages.get("end", 0))),
             blocks=raw.get("blocks", []),
         )
+
+    def titles(self, subject: str) -> list[tuple[str, str]]:
+        data = self._digest_json(subject)
+        if not data:
+            return []
+        return [(k, p.get("title", "")) for k, p in data.get("paragraphs", {}).items()]
+
+    def subjects_meta(self) -> dict[str, SubjectEntry]:
+        return dict(self._entries)

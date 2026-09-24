@@ -10,16 +10,20 @@ def test_homework_entry_fields():
 
 
 def test_question_fields():
-    q = Question(subject="География", paragraph=6, paragraph_title="Газовая промышленность",
+    q = Question(subject="География", paragraph="6", paragraph_title="Газовая промышленность",
                  pages=(22, 25), text="Какой вопрос?")
-    assert q.pages == (22, 25)
-    assert asdict(q)["paragraph"] == 6
+    assert q.paragraph == "6"
+    assert asdict(q)["paragraph"] == "6"
 
 
-def test_paragraph_fields():
-    p = Paragraph(number=6, title="Газовая промышленность", pages=(22, 25), blocks=[{"type": "page", "no": 22}])
-    assert p.number == 6
-    assert p.blocks[0]["type"] == "page"
+def test_paragraph_uses_key():
+    p = Paragraph(key="6", title="Газовая", pages=(22, 25), blocks=[])
+    assert p.key == "6"
+
+
+def test_question_paragraph_is_str():
+    q = Question(subject="ОБЗР", paragraph="6.1", paragraph_title="Х", pages=(1, 2), text="Q?")
+    assert q.paragraph == "6.1"
 
 
 def test_llm_config_frozen():

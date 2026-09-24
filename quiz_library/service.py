@@ -38,7 +38,7 @@ class QuizService:
         number = parse_paragraph(entry.content, patterns)
         if number is None:
             return None
-        paragraph = self.registry.paragraph(entry.subject, number)
+        paragraph = self.registry.paragraph(entry.subject, str(number))
         if paragraph is None:
             return None
         try:
@@ -48,7 +48,7 @@ class QuizService:
             return None
         return Question(
             subject=entry.subject,
-            paragraph=number,
+            paragraph=str(number),
             paragraph_title=paragraph.title,
             pages=paragraph.pages,
             text=text,

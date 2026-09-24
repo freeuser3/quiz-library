@@ -18,7 +18,7 @@ class FakeLLM:
 
 
 def _registry():
-    p = Paragraph(number=6, title="Газовая промышленность", pages=(22, 25),
+    p = Paragraph(key="6", title="Газовая промышленность", pages=(22, 25),
                   blocks=[{"type": "text", "lines": ["Газ важен.", "Газ горит."]}])
 
     class R:
@@ -30,8 +30,8 @@ def _registry():
                 return None
             return SubjectEntry(book="b", digest_path="x.json", paragraph_patterns=["параграф", "§"])
 
-        def paragraph(self, subject, number):
-            if subject.lower() == "география" and number == 6:
+        def paragraph(self, subject, key):
+            if subject.lower() == "география" and key == "6":
                 return self._p
             return None
 
@@ -53,7 +53,7 @@ async def test_question_for_full_flow():
     svc = QuizService(_registry(), FakeLLM(text="Вопрос?"))
     q = await svc.question_for(HomeworkEntry(subject="География", content="параграф 6, вопросы 1-3"))
     assert isinstance(q, Question)
-    assert q.paragraph == 6
+    assert q.paragraph == "6"
     assert q.paragraph_title == "Газовая промышленность"
     assert q.pages == (22, 25)
     assert q.text == "Вопрос?"

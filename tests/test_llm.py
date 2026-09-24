@@ -7,7 +7,7 @@ CONTENT = "Какой фактор размещения важнее для га
 
 
 def _para(lines=("Газ.", "Текст параграфа.")):
-    return Paragraph(number=6, title="Газовая промышленность", pages=(22, 25),
+    return Paragraph(key="6", title="Газовая промышленность", pages=(22, 25),
                      blocks=[{"type": "text", "lines": list(lines)}])
 
 

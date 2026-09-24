@@ -63,7 +63,7 @@ def test_paragraph_loaded(tmp_path):
     dg = tmp_path / "g.json"
     _write_digest(dg)
     r = load_registry(_write_subjects(tmp_path, dg))
-    p = r.paragraph("География", 6)
+    p = r.paragraph("География", "6")
     assert isinstance(p, Paragraph)
     assert p.title == "Газовая промышленность"
     assert p.pages == (22, 25)
@@ -74,14 +74,14 @@ def test_paragraph_missing_returns_none(tmp_path):
     dg = tmp_path / "g.json"
     _write_digest(dg)
     r = load_registry(_write_subjects(tmp_path, dg))
-    assert r.paragraph("География", 999) is None
-    assert r.paragraph("НетТаких", 6) is None
+    assert r.paragraph("География", "999") is None
+    assert r.paragraph("НетТаких", "6") is None
 
 
 def test_digest_file_missing_returns_none(tmp_path):
     subjects_path = _write_subjects(tmp_path, tmp_path / "missing.json")
     r = load_registry(subjects_path)
-    assert r.paragraph("География", 6) is None
+    assert r.paragraph("География", "6") is None
 
 
 def test_registry_on_real_geography_digest(geo_digest_path):
@@ -97,7 +97,7 @@ def test_registry_on_real_geography_digest(geo_digest_path):
                 "paragraph_patterns": ["параграф", "параграфа", "§"],
             }}, f, ensure_ascii=False)
         r = load_registry(sp)
-        p = r.paragraph("География", 6)
+        p = r.paragraph("География", "6")
         assert p is not None
         assert p.title
         assert p.pages == (22, 25)
