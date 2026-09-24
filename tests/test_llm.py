@@ -63,6 +63,13 @@ async def test_generate_question_returns_content():
     assert text == CONTENT
 
 
+def test_client_constructed_without_running_loop_ok():
+    # сессия aiohttp создаётся лениво (при первом async-вызове), поэтому
+    # конструкция клиента вне event loop не должна падать
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0))
+    assert client._session is None
+
+
 async def test_request_shape_thinking_disabled():
     resp = FakeResponse({"choices": [{"message": {"content": CONTENT}}]})
     sess = FakeSession(resp)

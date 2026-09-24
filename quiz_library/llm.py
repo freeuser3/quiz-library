@@ -30,14 +30,21 @@ class LLMError(Exception):
 class LLMClient:
     def __init__(self, config: LLMConfig, session: aiohttp.ClientSession | None = None):
         self.config = config
-        self.session = session or aiohttp.ClientSession()
+        self._session = session
         self._owns_session = session is None
         self.last_ttfb_ms = 0.0
         self.last_total_ms = 0.0
 
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        # лениво: aiohttp.ClientSession можно создавать только внутри event loop
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
     async def close(self) -> None:
-        if self._owns_session:
-            await self.session.close()
+        if self._owns_session and self._session is not None:
+            await self._session.close()
 
     def _build_prompt(self, paragraph: Paragraph) -> str:
         start, end = paragraph.pages
