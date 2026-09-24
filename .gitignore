@@ -4,3 +4,4 @@ __pycache__/
 digests/
 *.json.bak
 _q.txt
+.env
