@@ -138,3 +138,50 @@ async def test_prompt_truncated_to_max_context():
     await client.generate_question(_para(long_lines))
     user = sess.posts[0]["json"]["messages"][1]["content"]
     assert len(user) <= 12000 + 200
+
+
+CAND = [("7.5", "Безопасное поведение и современные увлечения молодёжи", 0.6),
+        ("7.8", "Безопасное поведение в цифровой среде", 0.59)]
+
+
+async def test_choose_paragraph_returns_clean_key():
+    resp = FakeResponse({"choices": [{"message": {"content": "7.8"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    key = await client.choose_paragraph(CAND, "безопасное поведение")
+    assert key == "7.8"
+
+
+async def test_choose_paragraph_accepts_dots_and_spaces():
+    resp = FakeResponse({"choices": [{"message": {"content": "  7.8. "}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    key = await client.choose_paragraph(CAND, "безопасное поведение")
+    assert key == "7.8"
+
+
+async def test_choose_paragraph_extracts_key_from_phrase():
+    resp = FakeResponse({"choices": [{"message": {"content": "тема 7.8"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    key = await client.choose_paragraph(CAND, "безопасное поведение")
+    assert key == "7.8"
+
+
+async def test_choose_paragraph_no_match_returns_none():
+    resp = FakeResponse({"choices": [{"message": {"content": "я не знаю"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    key = await client.choose_paragraph(CAND, "безопасное поведение")
+    assert key is None
+
+
+async def test_choose_paragraph_uses_candidate_list_in_prompt():
+    resp = FakeResponse({"choices": [{"message": {"content": "7.5"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    await client.choose_paragraph(CAND, "безопасное поведение")
+    user = sess.posts[0]["json"]["messages"][1]["content"]
+    assert "7.5" in user
+    assert "Безопасное поведение в цифровой среде" in user
+    assert "0.6" in user

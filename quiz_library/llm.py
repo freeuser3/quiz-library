@@ -22,6 +22,13 @@ SYSTEM_PROMPT = (
     "конце параграфа."
 )
 
+CHOOSE_PROMPT = (
+    "Ты - учитель. Дано домашнее задание и список тем учебника. "
+    "Определи, к какой теме относится задание. "
+    "Ответь ТОЛЬКО ключом темы из списка (строкой без лишнего текста).\n\n"
+    "Домашнее задание: {query}\n\nТемы:\n{candidates}"
+)
+
 
 class LLMError(Exception):
     pass
@@ -94,3 +101,35 @@ class LLMClient:
             raise LLMError("empty content from model")
         logger.info("llm qid=%s total_ms=%.0f ttfb_ms=%.0f", req_id, self.last_total_ms, self.last_ttfb_ms)
         return content.strip()
+
+    async def choose_paragraph(self, candidates: list[tuple[str, str, float]], query: str) -> str | None:
+        options = "\n".join(f"{key}. {title} (сходство {score})" for key, title, score in candidates)
+        prompt = CHOOSE_PROMPT.format(query=query, candidates=options)
+        payload = {
+            "model": self.config.model,
+            "thinking": {"enabled": False},
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        url = self.config.base_url.rstrip("/") + "/chat/completions"
+        try:
+            async with self.session.post(
+                url, json=payload, headers={"Authorization": f"Bearer {self.config.api_key}"},
+                timeout=self.config.timeout,
+            ) as resp:
+                data = await resp.json()
+                if resp.status != 200:
+                    raise LLMError(f"HTTP {resp.status}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+            raise LLMError(str(exc)) from exc
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        clean = content.strip().strip(".,;: ")
+        keys = {k for k, _, _ in candidates}
+        if clean in keys:
+            return clean
+        # 6.1 vs «6.1.» и «ключ 6.1»
+        import re
+        m = re.search(r"\b(" + "|".join(re.escape(k) for k in keys) + r")\b", clean)
+        return m.group(1) if m else None
