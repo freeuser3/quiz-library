@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "quiz-library"
 version = "0.1.0"
 description = "Subject-agnostic quiz core: paragraph text from textbook digests + LLM question generation"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = ["aiohttp>=3.9.0"]
 
 [project.optional-dependencies]

@@ -22,7 +22,7 @@
 
 ## Установка
 
-Python **3.12+**. Единственная зависимость — `aiohttp`.
+Python **3.11+**. Единственная зависимость — `aiohttp`.
 
 ```bash
 pip install "quiz-library @ git+https://github.com/freeuser3/quiz-library.git"
