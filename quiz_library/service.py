@@ -2,14 +2,32 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from quiz_library.digests import DigestsRegistry, load_registry
 from quiz_library.llm import LLMClient, LLMError
+from quiz_library.match import search_paragraphs
 from quiz_library.model import HomeworkEntry, Question
-from quiz_library.parser import parse_paragraph
+from quiz_library.parser import is_empty_homework, is_platform_homework, parse_paragraph
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Resolution:
+    key: str | None
+    reason: Literal["platform", "empty", "none", "number", "title", "ambiguous"]
+    candidates: list[tuple[str, str, float]] = field(default_factory=list)
+
+    @property
+    def choice(self) -> str | None:
+        if self.key is not None:
+            return self.key
+        if self.candidates:
+            return self.candidates[0][0]
+        return None
 
 
 class QuizService:
@@ -31,14 +49,61 @@ class QuizService:
                 return e
         return None
 
-    async def question_for(self, entry: HomeworkEntry) -> Question | None:
+    def resolution(self, entry: HomeworkEntry) -> Resolution:
+        meta = self.registry.subject(entry.subject)
+        if meta is None:
+            return Resolution(key=None, reason="none")
+        content = entry.content
+        if is_empty_homework(content):
+            return Resolution(key=None, reason="empty")
+        if is_platform_homework(content):
+            return Resolution(key=None, reason="platform")
+
         patterns = self.patterns_for(entry.subject)
-        if not patterns:
+        number = parse_paragraph(content, patterns) if patterns else None
+        titles = self.registry.titles(entry.subject)
+        key = str(number) if number is not None else None
+        if key is not None:
+            p = self.registry.paragraph(entry.subject, key)
+            if p is not None:
+                return Resolution(key=key, reason="number")
+
+        # числовой каскад для «N.M»: ищем ключ «*.N», если единственный
+        if number is not None and titles:
+            matches = [k for k, _ in titles if k.endswith(f".{number}")]
+            if len(matches) == 1:
+                return Resolution(key=matches[0], reason="number")
+
+        # затем title-поиск
+        if not titles:
+            # нет ни выжимки, ни номера
+            return Resolution(key=None, reason="none")
+        cands = search_paragraphs(titles, content, threshold=meta.search_threshold)
+        if not cands:
+            return Resolution(key=None, reason="none")
+        if len(cands) == 1:
+            return Resolution(key=cands[0][0], reason="title")
+        top, second = cands[0][2], cands[1][2]
+        if top / second >= meta.search_gap:
+            return Resolution(key=cands[0][0], reason="title")
+        if top < meta.search_llm_min:
+            return Resolution(key=cands[0][0], reason="title")  # сильных нет — ближайшее
+        return Resolution(key=None, reason="ambiguous", candidates=cands)
+
+    async def question_for(self, entry: HomeworkEntry) -> Question | None:
+        res = self.resolution(entry)
+        if res.reason in ("platform", "empty"):
             return None
-        number = parse_paragraph(entry.content, patterns)
-        if number is None:
-            return None
-        paragraph = self.registry.paragraph(entry.subject, str(number))
+        if res.key is None:
+            if res.reason == "ambiguous" and self.llm is not None:
+                try:
+                    res.key = await self.llm.choose_paragraph(res.candidates, entry.content)
+                except LLMError as exc:
+                    logger.warning("llm arbiter failed: %s", exc)
+                    res.key = None
+            if res.key is None:
+                return None
+        paragraph = self.registry.paragraph(entry.subject, res.key)
         if paragraph is None:
             return None
         try:
@@ -48,7 +113,7 @@ class QuizService:
             return None
         return Question(
             subject=entry.subject,
-            paragraph=str(number),
+            paragraph=res.key,
             paragraph_title=paragraph.title,
             pages=paragraph.pages,
             text=text,

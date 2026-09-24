@@ -30,6 +30,9 @@ def _registry():
                 return None
             return SubjectEntry(book="b", digest_path="x.json", paragraph_patterns=["параграф", "§"])
 
+        def titles(self, name):
+            return [("6", p.title)]
+
         def paragraph(self, subject, key):
             if subject.lower() == "география" and key == "6":
                 return self._p
@@ -91,3 +94,79 @@ async def test_from_config_builds_service(tmp_path):
     svc = QuizService.from_config(sp, FakeLLM(text="Q?"))
     q = await svc.question_for(HomeworkEntry(subject="География", content="параграф 6"))
     assert q and q.text == "Q?"
+
+
+class R2:
+    """Registry-fake с маленьким списком тем (ОБЗР) и match_paragraphs=False."""
+
+    def __init__(self, titles, match_paragraphs=False, search_threshold=None,
+                 search_llm_min=None):
+        self._titles = titles
+        self._match = match_paragraphs
+        self._thr = search_threshold
+        self._llm_min = search_llm_min
+
+    def subject(self, name):
+        kw = {}
+        if self._thr is not None:
+            kw["search_threshold"] = self._thr
+        if self._llm_min is not None:
+            kw["search_llm_min"] = self._llm_min
+        return SubjectEntry(book="b", digest_path="x.json", paragraph_patterns=["параграф", "§", "тема"],
+                            match_paragraphs=self._match, **kw)
+
+    def titles(self, name):
+        return self._titles
+
+    def paragraph(self, name, key):
+        for k, t in self._titles:
+            if k == key:
+                return Paragraph(key=key, title=t, pages=(1, 2), blocks=[])
+        return None
+
+
+async def test_resolution_no_match():
+    svc = QuizService(R2([("6.1", "Общие представления о здоровье"),
+                          ("7.5", "Безопасное поведение и современные увлечения молодёжи")]), FakeLLM())
+    # редкий токен отсутствует в заголовках → кандидатов нет → none
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="В горах Кавказа"))
+    assert r.reason == "none"
+
+
+async def test_resolution_exact_title():
+    svc = QuizService(R2([("5.3", "Пожарная безопасность в природной среде")]), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="Пожарная безопасность в природной среде"))
+    assert r.reason == "title"
+    assert r.key == "5.3"
+
+
+async def test_resolution_number_first():
+    svc = QuizService(R2([("6", "Газовая промышленность")], match_paragraphs=True), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="параграф 6"))
+    assert r.reason == "number"
+    assert r.key == "6"
+
+
+async def test_resolution_platform_marker():
+    svc = QuizService(R2([]), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="Физика", content="Сириус, урок 8"))
+    assert r.reason == "platform"
+
+
+async def test_resolution_empty_placeholder():
+    svc = QuizService(R2([]), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="Домашнее задание: ---Не указана---"))
+    assert r.reason == "empty"
+
+
+async def test_question_for_uses_arbiter_when_ambiguous():
+    class Pick(FakeLLM):
+        async def choose_paragraph(self, candidates, query):
+            return "7.8"
+
+    svc = QuizService(R2([("7.5", "Безопасное поведение и современные увлечения молодёжи"),
+                          ("7.8", "Безопасное поведение в цифровой среде")],
+                         search_threshold=0.15, search_llm_min=0.15), FakeLLM(text="Q?"))
+    svc.llm = Pick()
+    q = await svc.question_for(HomeworkEntry(subject="ОБЗР", content="безопасное поведение"))
+    assert q and q.paragraph == "7.8"
