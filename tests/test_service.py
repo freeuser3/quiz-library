@@ -220,3 +220,31 @@ async def test_resolution_obzr_conflicts_goes_to_arbiter():
     r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="прочитать тему про конфликты"))
     assert r.reason == "ambiguous"
     assert any(k in ("7.2", "7.4") for k, _, _ in r.candidates)
+
+
+async def test_resolution_logs_title_candidates(caplog):
+    import logging
+
+    svc = QuizService(
+        R2([("5.3", "Пожарная безопасность в природной среде"),
+            ("7.8", "Безопасное поведение в цифровой среде")], search_threshold=0.15),
+        FakeLLM(),
+    )
+    with caplog.at_level(logging.INFO, logger="quiz_library.service"):
+        r = svc.resolution(
+            HomeworkEntry(subject="ОБЗР", content="Пожарная безопасность в природной среде")
+        )
+    assert r.reason == "title" and r.key == "5.3"
+    msgs = [rec.message for rec in caplog.records]
+    assert any("resolution" in m and "candidates=" in m for m in msgs)
+
+
+async def test_resolution_logs_number_step(caplog):
+    import logging
+
+    svc = QuizService(R2([("6", "Газовая промышленность")], match_paragraphs=True), FakeLLM())
+    with caplog.at_level(logging.INFO, logger="quiz_library.service"):
+        r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="параграф 6"))
+    assert r.reason == "number" and r.key == "6"
+    msgs = [rec.message for rec in caplog.records]
+    assert any("resolution" in m and "number" in m and "key=6" in m for m in msgs)
