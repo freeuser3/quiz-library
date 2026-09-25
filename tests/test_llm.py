@@ -185,3 +185,43 @@ async def test_choose_paragraph_uses_candidate_list_in_prompt():
     assert "7.5" in user
     assert "Безопасное поведение в цифровой среде" in user
     assert "0.6" in user
+
+
+# --- complete ---
+
+async def test_complete_returns_content():
+    resp = FakeResponse({"choices": [{"message": {"content": "итог недели"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    text = await client.complete("Ты — учитель.", "Оценки: 5, 4.")
+    assert text == "итог недели"
+
+
+async def test_complete_sends_system_and_user_prompts():
+    resp = FakeResponse({"choices": [{"message": {"content": "итог"}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    await client.complete("СИСТЕМА", "ДАННЫЕ")
+    body = sess.posts[0]["json"]
+    assert body["model"] == "m"
+    assert body["thinking"] == {"enabled": False}
+    assert body["messages"][0]["role"] == "system"
+    assert body["messages"][0]["content"] == "СИСТЕМА"
+    assert body["messages"][1]["role"] == "user"
+    assert body["messages"][1]["content"] == "ДАННЫЕ"
+
+
+async def test_complete_http_error_raises_llm_error():
+    resp = FakeResponse({"error": "boom"}, status=500)
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    with pytest.raises(LLMError):
+        await client.complete("system", "user")
+
+
+async def test_complete_empty_content_raises_llm_error():
+    resp = FakeResponse({"choices": [{"message": {"content": ""}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    with pytest.raises(LLMError):
+        await client.complete("system", "user")

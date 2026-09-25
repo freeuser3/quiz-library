@@ -63,14 +63,13 @@ class LLMClient:
             f"Страницы: {start}-{end}\n\n{body}"
         )
 
-    async def generate_question(self, paragraph: Paragraph) -> str:
-        prompt = self._build_prompt(paragraph)
+    async def _chat(self, system: str, user: str) -> str:
         payload = {
             "model": self.config.model,
             "thinking": {"enabled": False},
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
             ],
         }
         url = self.config.base_url.rstrip("/") + "/chat/completions"
@@ -78,9 +77,9 @@ class LLMClient:
         t0 = time.monotonic()
         try:
             async with self.session.post(
-            url, json=payload, headers={"Authorization": f"Bearer {self.config.api_key}"},
-            timeout=self.config.timeout,
-        ) as resp:
+                url, json=payload, headers={"Authorization": f"Bearer {self.config.api_key}"},
+                timeout=self.config.timeout,
+            ) as resp:
                 self.last_ttfb_ms = (time.monotonic() - t0) * 1000.0
                 data = await resp.json()
                 if resp.status != 200:
@@ -101,6 +100,13 @@ class LLMClient:
             raise LLMError("empty content from model")
         logger.info("llm qid=%s total_ms=%.0f ttfb_ms=%.0f", req_id, self.last_total_ms, self.last_ttfb_ms)
         return content.strip()
+
+    async def generate_question(self, paragraph: Paragraph) -> str:
+        prompt = self._build_prompt(paragraph)
+        return await self._chat(SYSTEM_PROMPT, prompt)
+
+    async def complete(self, system: str, user: str) -> str:
+        return await self._chat(system, user)
 
     async def choose_paragraph(self, candidates: list[tuple[str, str, float]], query: str) -> str | None:
         options = "\n".join(f"{key}. {title} (сходство {score})" for key, title, score in candidates)
