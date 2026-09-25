@@ -6,21 +6,24 @@ import re
 _MAX_PARA = 999
 
 
-def parse_paragraph(text: str, patterns: list[str]) -> int | None:
+def parse_paragraph(text: str, patterns: list[str]) -> int | str | None:
     """Первый номер после любого из заданных паттернов («параграф», «§», …).
 
     Паттерн понимается как префикс: за ним следует необязательное число.
+    Номер может быть составным «N.M» (модуль.тема для ОБЗР) — тогда
+    возвращается строка «N.M», иначе целое int.
     Порядок паттернов важен: из списка строится один regex с |, поэтому
     длинные («параграфа») ставятся первыми, чтобы они выигрывали у коротких.
     """
     if not text or not patterns:
         return None
     patterns = sorted(patterns, key=len, reverse=True)
-    expr = "(?:" + "|".join(re.escape(p) for p in patterns) + r")\s*(\d{1,3})\b"
+    expr = "(?:" + "|".join(re.escape(p) for p in patterns) + r")\s*(\d{1,3}(?:\.\d{1,2})?)\b"
     m = re.search(expr, text, re.IGNORECASE)
     if not m:
         return None
-    return int(m.group(1))
+    raw = m.group(1)
+    return raw if "." in raw else int(raw)
 
 
 _PLATFORM_WORDS = {

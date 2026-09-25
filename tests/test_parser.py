@@ -33,6 +33,14 @@ def test_paragrapha_form():
     assert parse_paragraph("начиная с параграфа 17", ["параграф", "параграфа", "§"]) == 17
 
 
+def test_topic_with_module_number_keeps_dot():
+    assert parse_paragraph("тема 8.1", ["тема", "темы", "модуль", "модули", "параграф", "параграфа", "§"]) == "8.1"
+
+
+def test_topic_plain_number_still_int():
+    assert parse_paragraph("тема 8", ["тема", "темы"]) == 8
+
+
 def test_no_paragraph_returns_none():
     assert parse_paragraph("выполнить упражнение 3", ["параграф", "§"]) is None
 

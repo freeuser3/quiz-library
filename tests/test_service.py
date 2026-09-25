@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 
 from quiz_library.digests import DigestsRegistry, SubjectEntry
@@ -170,3 +173,50 @@ async def test_question_for_uses_arbiter_when_ambiguous():
     svc.llm = Pick()
     q = await svc.question_for(HomeworkEntry(subject="ОБЗР", content="безопасное поведение"))
     assert q and q.paragraph == "7.8"
+
+
+OBZR_SUBJECTS = os.environ.get("OBZR_SUBJECTS_PATH")
+
+
+# Интеграция с реальной выжимкой ОБЗР: subjects.json из GeoRag содержит
+# относительные digest-пути — прогон должен идти из каталога GeoRag
+# (PYTHONPATH=...quiz-library), digests/obzr.json резолвится относительно CWD.
+@pytest.mark.skipif(not OBZR_SUBJECTS, reason="real OBZR subjects.json not configured")
+async def test_resolution_obzr_natural_environment_not_digital():
+    svc = QuizService.from_config(Path(OBZR_SUBJECTS), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР",
+                                     content="Правила безопасного поведения в природной среде"))
+    assert r.key != "8.1"
+    assert r.reason in ("title", "ambiguous")
+
+
+@pytest.mark.skipif(not OBZR_SUBJECTS, reason="real OBZR subjects.json not configured")
+async def test_resolution_obzr_hills_finds_gora():
+    svc = QuizService.from_config(Path(OBZR_SUBJECTS), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="Безопасное поведение в горах"))
+    assert r.key == "5.4"
+
+
+@pytest.mark.skipif(not OBZR_SUBJECTS, reason="real OBZR subjects.json not configured")
+async def test_resolution_obzr_water_and_defense():
+    svc = QuizService.from_config(Path(OBZR_SUBJECTS), FakeLLM())
+    r1 = svc.resolution(HomeworkEntry(subject="ОБЗР",
+                                      content="Правила безопасного поведения на водоёмах"))
+    assert r1.reason == "title" and r1.key == "5.5"
+    r2 = svc.resolution(HomeworkEntry(subject="ОБЗР", content="Оборона страны"))
+    assert r2.key == "10.2"
+
+
+@pytest.mark.skipif(not OBZR_SUBJECTS, reason="real OBZR subjects.json not configured")
+async def test_resolution_obzr_module_topic_number():
+    svc = QuizService.from_config(Path(OBZR_SUBJECTS), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="тема 8.1, вопросы 1-2"))
+    assert r.reason == "number" and r.key == "8.1"
+
+
+@pytest.mark.skipif(not OBZR_SUBJECTS, reason="real OBZR subjects.json not configured")
+async def test_resolution_obzr_conflicts_goes_to_arbiter():
+    svc = QuizService.from_config(Path(OBZR_SUBJECTS), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="ОБЗР", content="прочитать тему про конфликты"))
+    assert r.reason == "ambiguous"
+    assert any(k in ("7.2", "7.4") for k, _, _ in r.candidates)
