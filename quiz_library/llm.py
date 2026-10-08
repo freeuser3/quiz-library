@@ -63,6 +63,24 @@ class LLMClient:
             f"Страницы: {start}-{end}\n\n{body}"
         )
 
+    def _build_multi_prompt(self, paragraphs: list[Paragraph]) -> str:
+        parts = []
+        start = end = None
+        for p in paragraphs:
+            ps, pe = p.pages
+            start = ps if start is None else min(start, ps)
+            end = pe if end is None else max(end, pe)
+            parts.append(
+                f"Параграф {p.key}. {p.title}\n\n{paragraph_plain_text(p)}"
+            )
+        body = "\n\n---\n\n".join(parts)
+        if len(body) > MAX_CONTEXT_CHARS:
+            body = body[:MAX_CONTEXT_CHARS].rsplit("\n", 1)[0]
+        return (
+            f"Параграфы: {', '.join(p.key for p in paragraphs)}\n"
+            f"Страницы: {start}-{end}\n\n{body}"
+        )
+
     async def _chat(self, system: str, user: str) -> str:
         payload = {
             "model": self.config.model,
@@ -103,6 +121,10 @@ class LLMClient:
 
     async def generate_question(self, paragraph: Paragraph) -> str:
         prompt = self._build_prompt(paragraph)
+        return await self._chat(SYSTEM_PROMPT, prompt)
+
+    async def generate_questions(self, paragraphs: list[Paragraph]) -> str:
+        prompt = self._build_multi_prompt(paragraphs)
         return await self._chat(SYSTEM_PROMPT, prompt)
 
     async def complete(self, system: str, user: str) -> str:

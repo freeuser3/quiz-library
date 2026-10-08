@@ -248,3 +248,71 @@ async def test_resolution_logs_number_step(caplog):
     assert r.reason == "number" and r.key == "6"
     msgs = [rec.message for rec in caplog.records]
     assert any("resolution" in m and "number" in m and "key=6" in m for m in msgs)
+
+
+def _registry_multi():
+    ps = {
+        "9": Paragraph(key="9", title="Дыхание", pages=(30, 32),
+                       blocks=[{"type": "text", "lines": ["Газообмен."]}]),
+        "10": Paragraph(key="10", title="Пищеварение", pages=(33, 35),
+                        blocks=[{"type": "text", "lines": ["Ферменты."]}]),
+    }
+
+    class R:
+        def subject(self, name):
+            if name.lower() != "биология":
+                return None
+            return SubjectEntry(book="b", digest_path="x.json",
+                                paragraph_patterns=["параграф", "§"])
+
+        def titles(self, name):
+            return [(k, p.title) for k, p in ps.items()]
+
+        def paragraph(self, subject, key):
+            if subject.lower() != "биология":
+                return None
+            return ps.get(key)
+
+    return R()
+
+
+async def test_resolution_range_returns_all_keys():
+    svc = QuizService(_registry_multi(), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="Биология", content="параграф 9-10"))
+    assert r.reason == "number"
+    assert r.key == "9"
+    assert r.keys == ["9", "10"]
+
+
+async def test_resolution_enumeration_returns_all_keys():
+    svc = QuizService(_registry_multi(), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="Биология", content="параграф 9 и 10"))
+    assert r.reason == "number"
+    assert r.keys == ["9", "10"]
+
+
+async def test_resolution_range_partially_missing_keeps_existing():
+    svc = QuizService(_registry_multi(), FakeLLM())
+    r = svc.resolution(HomeworkEntry(subject="Биология", content="параграф 10-11"))
+    assert r.reason == "number"
+    assert r.key == "10"
+    assert r.keys == ["10"]
+
+
+async def test_question_for_range_merges_paragraphs():
+    class Rec(FakeLLM):
+        def __init__(self):
+            super().__init__(text="Вопрос?")
+            self.used = None
+
+        async def generate_questions(self, paragraphs):
+            self.used = [p.key for p in paragraphs]
+            return self.text
+
+    llm = Rec()
+    svc = QuizService(_registry_multi(), llm)
+    q = await svc.question_for(HomeworkEntry(subject="Биология", content="параграф 9-10"))
+    assert q is not None
+    assert q.text == "Вопрос?"
+    assert q.paragraph == "9"
+    assert llm.used == ["9", "10"]

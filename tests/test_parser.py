@@ -2,6 +2,7 @@ import pytest
 
 from quiz_library.parser import (
     parse_paragraph,
+    parse_paragraphs,
     is_platform_homework,
     is_empty_homework,
     has_para_marker_without_number,
@@ -83,3 +84,50 @@ def test_marker_without_number_true():
 
 def test_marker_without_number_false():
     assert not has_para_marker_without_number("Безопасное поведение в горах", ["параграф", "§"])
+
+
+def test_paragraphs_range_expands():
+    assert parse_paragraphs("параграф 9-10, вопросы", ["параграф", "§"]) == [9, 10]
+
+
+def test_paragraphs_mixed_markers_and_range():
+    # реальный пример: «пар.9-10, вопросы, пар.11 прочитать»
+    assert parse_paragraphs("пар.9-10, вопросы, пар.11 прочитать",
+                            ["пар.", "пар", "параграф", "параграфа", "§"]) == [9, 10, 11]
+
+
+def test_paragraphs_enumeration_with_space():
+    assert parse_paragraphs("Пар. 10, 11 запись в тетради", ["пар.", "параграф", "§"]) == [10, 11]
+
+
+def test_paragraphs_enumeration_with_and():
+    assert parse_paragraphs("параграф 9 и 10", ["параграф", "§"]) == [9, 10]
+
+
+def test_paragraphs_questions_suffix_not_paragraphs():
+    assert parse_paragraphs("прочитать параграф 6, вопросы 1-3", ["параграф", "§"]) == [6]
+
+
+def test_paragraphs_cap_at_five():
+    assert parse_paragraphs("параграф 1-20", ["параграф", "§"]) == [1, 2, 3, 4, 5]
+
+
+def test_paragraphs_cap_counted_across_markers():
+    assert parse_paragraphs("параграф 1, параграф 2, параграф 3, параграф 4, параграф 5, параграф 6",
+                            ["параграф", "§"]) == [1, 2, 3, 4, 5]
+
+
+def test_paragraphs_dotted_module_kept():
+    assert parse_paragraphs("тема 8.1, вопросы 1-2", ["тема", "темы", "модуль"]) == ["8.1"]
+
+
+def test_paragraphs_single_is_parse_paragraph():
+    assert parse_paragraphs("выучить §6", ["параграф", "§"]) == [6]
+
+
+def test_paragraphs_no_marker_returns_empty():
+    assert parse_paragraphs("выполнить упражнение 3", ["параграф", "§"]) == []
+
+
+def test_paragraphs_empty_text_returns_empty():
+    assert parse_paragraphs("", ["параграф", "§"]) == []

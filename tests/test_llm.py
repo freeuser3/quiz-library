@@ -11,6 +11,23 @@ def _para(lines=("Газ.", "Текст параграфа.")):
                      blocks=[{"type": "text", "lines": list(lines)}])
 
 
+async def test_generate_questions_combines_paragraphs_and_truncates():
+    resp = FakeResponse({"choices": [{"message": {"content": CONTENT}}]})
+    sess = FakeSession(resp)
+    client = LLMClient(LLMConfig("https://api.dslab.tech/v1", "K", "m", 20.0), session=sess)
+    second = Paragraph(key="7", title="Электроэнергетика", pages=(26, 28),
+                       blocks=[{"type": "text", "lines": ["Ток.", "Энергия."]}])
+    await client.generate_questions([_para(), second])
+    user = sess.posts[0]["json"]["messages"][1]["content"]
+    assert "6" in user and "7" in user
+    long_lines = [f"строка {i} " + "-" * 50 for i in range(300)]
+    many = [Paragraph(key=str(k), title=f"T{k}", pages=(k, k),
+                      blocks=[{"type": "text", "lines": long_lines}]) for k in range(3)]
+    await client.generate_questions(many)
+    user2 = sess.posts[1]["json"]["messages"][1]["content"]
+    assert len(user2) <= 12000 + 200
+
+
 class FakeResponse:
     def __init__(self, payload, status=200):
         self._payload = payload
